@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com/cyclomics/cyclomicsseq/master/nextflow_schema.json",
+  "title": "Cyclomics/CyclomicsSeq",
+  "description": "Create high quality alignment data with variant identification for the Cyclomics CyclomicsSeq protocol.",
+  "type": "object",
+  "definitions": {
+    "output_options": {
+      "title": "output_options",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "output_dir": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": ["output_dir"]
+    },
+    "input_options": {
+      "title": "Input Options",
+      "type": "object",
+      "description": "Options that define where the workflow will take data from for analysis.",
+      "default": "",
+      "properties": {
+        "input_read_dir": {
+          "type": "string",
+          "format": "path",
+          "description": "Folder with pod5 files.",
+          "help_text": "bla bla bla.",
+          "default": ""
+        }
+      },
+      "required": ["input_read_dir"]
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "#/definitions/output_options"
+    },
+    {
+      "$ref": "#/definitions/input_options"
+    }
+  ]
+}
