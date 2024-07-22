@@ -2,6 +2,7 @@ import nextflow.util.BlankSeparatedList
 
 
 process DummyPreProcess {
+    // Put the orignal filename in a txt file, then sleep a random number of seconds (<5) to pretend to be busy.
     publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
     
     input:
@@ -17,6 +18,7 @@ process DummyPreProcess {
     """
 }
 process DummyProcess {
+    // in essence just rename the file.
     publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
     
     input:
@@ -30,9 +32,13 @@ process DummyProcess {
     """
 }
 
-// Nextflow scan does a silly thing where it feeds back the growing list of
-// historical outputs. We only ever need the most recent output (the "state").
+
+
 process AgregateFiles{
+    // Implemented to work with nextflow.preview.recursion: puts the contents of the input file 
+    // into an ever growing file.
+    // Nextflow scan does a silly thing where it feeds back the growing list of
+    // historical outputs. We only ever need the most recent output (the "state").
     publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
     
     input:
@@ -58,6 +64,7 @@ process AgregateFiles{
 }
 
 process Report {
+    // Call the python script that makes a html report.
     publishDir "${params.output_dir}/", pattern: "", mode: 'copy'
     maxForks = 1
     input:
@@ -70,9 +77,5 @@ process Report {
     """
     ls
     create_report.py
-    # echo "report iteration:" > report.html
-    # echo $task.index >> report.html
-    # echo "contents for far" >> report.html
-    # cat $my_file >> report.html
     """
 }

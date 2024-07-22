@@ -3,9 +3,13 @@
 import glob
 import os
 
+HTML_TABLE = str
 
-def create_table(folder_path = ".", extension= ".txt"):
-    """Create a table for all files ending in the given extension."""
+def create_table(folder_path = ".", extension= ".txt") -> HTML_TABLE:
+    """
+    Create a html table for all files ending in the given extension.
+    Each line within the file will be reported in the table.
+    """
     # Ensure the extension starts with a dot
     if not extension.startswith('.'):
         extension = '.' + extension
@@ -29,7 +33,10 @@ def create_table(folder_path = ".", extension= ".txt"):
     return table
 
 
-def create_report():
+def create_report() -> None:
+    """
+    Create a simple html report from all .txt files in the current folder.
+    """
     with open("report.html", "w") as f:
         f.write(report_start)
         f.write(create_table())
