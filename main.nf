@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-import nextflow.util.BlankSeparatedList
 
 nextflow.enable.dsl = 2
 // Required for .scan operations
@@ -13,6 +12,7 @@ nextflow.preview.recursion=true
 // reference indexes are expected to be in reference folder
 params.input_read_dir = "test_in"
 params.output_dir = "realtime_example_output"
+params.process_existing_files = true
 
 // ### Printout for user
 log.info """
@@ -29,79 +29,14 @@ log.info """
     Include statements
 ========================================================================================
 */
-process DummyPreProcess {
-    publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
-    
-    input:
-        tuple val(sample_id), val(file_id), path(my_file) 
-    output:
-        tuple val(sample_id), val(file_id),path("${my_file.SimpleName}_output.txt")
+include {
+    DummyPreProcess as RealtimePreprocess
+    DummyPreProcess as ExistingPreprocess
+    DummyProcess
+    AgregateFiles
+    Report
+} from "./submodules"
 
-    script:
-    """
-    echo '${my_file}' > ${my_file.SimpleName}_output.txt
-    MAX_SLEEP=5
-    sleep \$((RANDOM % \$MAX_SLEEP + 1))
-    """
-}
-process DummyProcess {
-    publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
-    
-    input:
-        tuple val(sample_id), val(file_id), path(my_file) 
-    output:
-        tuple val(sample_id), val(file_id),path("*_${my_file.name}")
-
-    script:
-    """
-    cat ${my_file} > procecced_${my_file.name}
-    """
-}
-
-// Nextflow scan does a silly thing where it feeds back the growing list of
-// historical outputs. We only ever need the most recent output (the "state").
-process AgregateFiles{
-    publishDir "${params.output_dir}/${task.process.replaceAll(':', '/')}", pattern: "", mode: 'copy'
-    
-    input:
-        path stats 
-
-    output:
-        path("*state.txt")
-    script:
-        def new_input = stats instanceof BlankSeparatedList ? stats.first() : stats
-        def state = stats instanceof BlankSeparatedList ? stats.last() : "NOSTATE"
-        String output = "all_stats.${task.index}.state.txt"
-    """
-    if [[ "$state" == "NOSTATE" ]]; then
-        echo "No state the prepend"
-    else
-        echo "State the prepend"
-        cat $state > ${output}
-    fi
-    
-    cat $new_input >> ${output}
-
-    """    
-}
-
-process Report {
-    publishDir "${params.output_dir}/", pattern: "", mode: 'copy'
-    
-    input:
-        path(my_file) 
-
-    output:
-        path("*report.html")
-
-    script:
-    """
-    echo "report iteration:" > report.html
-    echo $task.index >> report.html
-    echo "contents for far" >> report.html
-    cat $my_file >> report.html
-    """
-}
 
 /*
 ========================================================================================
@@ -114,19 +49,32 @@ workflow {
     AA. Parameter processing 
     ========================================================================================
     */
-    // check environments
-    // pod5_files = Channel.fromPath("${params.input_read_dir}/*.pod5")
+    // check if we are collecting existing data
+    if (params.process_existing_files) {
+        pod5_files_initial = Channel.fromPath("${params.input_read_dir}/*.pod5")
+    }
+    else {
+        pod5_files_initial = Channel.empty()
+    }
+    pod5_files_initial.dump(tag: "existing-files")
+
     pod5_files = Channel.watchPath("${params.input_read_dir}/*.pod5",'create,modify')
-        .map(x -> [x.Parent.simpleName, x.simpleName,x])
-    
-    // pod5_files.view()
-    DummyPreProcess(pod5_files)
-    DummyProcess(DummyPreProcess.out)
+        .until{file -> file.name == 'DONE.pod5'}
+    pod5_files.dump(tag: "realtime-collect")
+
+    // pod5_files_initial = pod5_files_initial.concat(pod5_files)
+    pod5_files_initial = pod5_files_initial.map(x -> [x.Parent.simpleName, x.simpleName,x])
+    pod5_files = pod5_files.map(x -> [x.Parent.simpleName, x.simpleName,x])
+    pod5_files.dump(tag: "preanalysis-pod5")
+
+    ExistingPreprocess(pod5_files_initial)
+    RealtimePreprocess(pod5_files)
+
+    DPP = ExistingPreprocess.out.concat(RealtimePreprocess.out)
+    DummyProcess(DPP)
     // proccessed_pod5_files = DummyProcess.out.map(it -> it[2])
-    // proccessed_pod5_files.dump(tag: 'processed_pod5')
-    
+    // DummyProcess.dump(tag: 'processed_pod5')
     aggregate = AgregateFiles.scan(DummyProcess.out.map{tag,other_tag,file -> file })
-    // AgregateFiles.view(it -> it.text)
     Report(aggregate)
 }
 
